@@ -42,18 +42,28 @@ my_dataset = data_dict
 
 
 ### Task 2: Remove outliers
-def outlier_identifier(dataset, feature): # check if values in a given feature contain outliers (mean +-1.5std)
+### Remove 2 clear outliers by browsing datapoints' names
+my_dataset.pop('THE TRAVEL AGENCY IN THE PARK', 0)
+my_dataset.pop('TOTAL', 0)
+
+
+def outlier_identifier(dataset, feature): # Using Tukey's Inter Quartile Range method
     values_list = []
     for _, v in dataset.iteritems():
         if v[feature] != 'NaN':
             values_list.append(v[feature])
     import numpy as np
-    std = np.std(values_list)
-    mean = np.mean(values_list)
+    
+    Q1 = np.percentile(values_list, q = 25)
+    Q3 = np.percentile(values_list, q = 75)
+    iqr = Q3 - Q1
+    lower_fence = Q1 - 1.5*iqr
+    upper_fence = Q3 + 1.5*iqr
+    
     outlier_cnt = 0
     outlier_values = []
     for value in values_list:
-        if value > (mean + 1.5*std) or value < (mean - 1.5*std):
+        if value > upper_fence or value < lower_fence:
             outlier_cnt +=1
             outlier_values.append(value)
     return outlier_cnt, outlier_values
@@ -208,7 +218,7 @@ pipe = Pipeline([('Scale_Features',scaler),('SKB', skb),('Classifier',clf)])
 # print sorted(pipe.get_params().keys())
 
 params = {'SKB__k':range(1,len(features_list)),'Classifier__kernel':['linear', 'rbf'], 'Classifier__C':[1, 10]}
-my_clf = GridSearchCV(pipe, param_grid=params, scoring='accuracy')
+my_clf = GridSearchCV(pipe, param_grid=params, scoring='f1_weighted')
 my_clf.fit(features_train, labels_train)
 
 
@@ -222,9 +232,9 @@ print('Selected Features:')
 features_selected_bool = my_clf.best_estimator_.named_steps['SKB'].get_support()
 features_selected_list = [x for x, y in zip(features_list[1:], features_selected_bool) if y]
 
-print features_selected_list
+print features_selected_list, '\n'
 
-
+print ('My fine-tuned Algorithm')
 print('Best Score found by grid search:')  
 print my_clf.best_score_      
 print 'Accuracy:',accuracy_score(labels_test,pred)    
@@ -235,6 +245,26 @@ print 'F1 Score:',f1_score(labels_test,pred)
 clf = my_clf.best_estimator_
 
 
+
+
+
+
+
+print ('Using the from_this_person_to_poi')
+test_eatures_list = ['poi','from_this_person_to_poi']
+### Extract features and labels from dataset for local testing
+data = featureFormat(my_dataset, test_eatures_list, sort_keys = True)
+labels, features = targetFeatureSplit(data)
+features_train_original, features_test_original, labels_train_original, labels_test_original = \
+    train_test_split(features, labels, test_size=0.4, random_state=42)
+
+second_clf = svm.SVC(kernel ='linear', C =10)
+second_clf.fit(features_train_original, labels_train_original)
+pred = second_clf.predict(features_test_original)
+print 'Accuracy:',accuracy_score(labels_test_original,pred)    
+print 'Precision:',precision_score(labels_test_original,pred)    
+print 'Recall:',recall_score(labels_test_original,pred)    
+print 'F1 Score:',f1_score(labels_test_original,pred)
 
 
 ### Task 6: Dump your classifier, dataset, and features_list so anyone can
